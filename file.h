@@ -3,7 +3,18 @@
 
 FILE* pFile;
 WORD clientVersion;
-DWORD sumTime;
+
+struct Packet {
+	DWORD timeOffset;
+	LPBYTE packet;
+	DWORD packetLength;
+
+	Packet(DWORD timeOffset, LPBYTE packet, DWORD packetLength) {
+		this->timeOffset = timeOffset;
+		this->packet = packet;
+		this->packetLength = packetLength;
+	}
+};
 
 class GenericFile {
 protected:

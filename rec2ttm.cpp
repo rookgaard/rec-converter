@@ -3,19 +3,7 @@
 #include "file.h"
 #include "aes256.h"
 
-//#define DEBUG
-
-struct Packet {
-	DWORD delay;
-	LPBYTE packet;
-	DWORD packetLength;
-
-	Packet(DWORD delay, LPBYTE packet, DWORD packetLength) {
-		this->delay = delay;
-		this->packet = packet;
-		this->packetLength = packetLength;
-	}
-};
+#define DEBUG
 
 WORD GuessVersion(CONST BYTE version, CONST BYTE encryption) {
 	switch (version) {
@@ -30,25 +18,7 @@ WORD GuessVersion(CONST BYTE version, CONST BYTE encryption) {
 	return 800;
 }
 
-size_t strpos(const std::string& haystack, const std::string& needle)
-{
-	int sleng = haystack.length();
-	int nleng = needle.length();
-
-	if (sleng == 0 || nleng == 0)
-		return std::string::npos;
-
-	for (int i = 0, j = 0; i < sleng; j = 0, i++)
-	{
-		while (i + j < sleng && j < nleng && haystack[i + j] == needle[j])
-			j++;
-		if (j == nleng)
-			return i;
-	}
-	return std::string::npos;
-}
-
-std::vector<Packet> loadRecording(const std::string path)
+std::vector<Packet> loadRec(const std::string path)
 {
 	std::vector<Packet> packetList;
 	BufferedFile File;
@@ -71,7 +41,6 @@ std::vector<Packet> loadRecording(const std::string path)
 	fflush(pFile);
 #endif
 	DWORD packets;
-	sumTime = 0;
 
 	if (encryption == 2) {
 		File.ReadDword(packets);
@@ -90,23 +59,22 @@ std::vector<Packet> loadRecording(const std::string path)
 			WORD packetLength;
 			File.ReadWord(packetLength);
 #ifdef DEBUG
-			fprintf(pFile, "packetLength: %d\n", packetLength);
-			fflush(pFile);
+			//fprintf(pFile, "packetLength: %d\n", packetLength);
+			//fflush(pFile);
 #endif
-			DWORD delay;
-			File.ReadDword(delay);
+			DWORD timeOffset;
+			File.ReadDword(timeOffset);
 #ifdef DEBUG
-			fprintf(pFile, "delay: %d\n", delay);
+			fprintf(pFile, "timeOffset: %d\n", timeOffset);
 			fflush(pFile);
 #endif
-			sumTime += delay;
 
 			if (!packetLength) {
 				DWORD Avail;
 				File.ReadDword(Avail);
 #ifdef DEBUG
-				fprintf(pFile, "Avail: %d\n", Avail);
-				fflush(pFile);
+				//fprintf(pFile, "Avail: %d\n", Avail);
+				//fflush(pFile);
 #endif
 			}
 			else {
@@ -114,10 +82,10 @@ std::vector<Packet> loadRecording(const std::string path)
 				DWORD Avail;
 				File.ReadDword(Avail);
 #ifdef DEBUG
-				fprintf(pFile, "Avail: %d\n", Avail);
-				fflush(pFile);
+				//fprintf(pFile, "Avail: %d\n", Avail);
+				//fflush(pFile);
 #endif
-				BYTE Key = packetLength + delay + 2;
+				BYTE Key = packetLength + timeOffset + 2;
 
 				for (WORD i = 0; i < packetLength; i++) {
 					CHAR Minus = Key + 33 * i;
@@ -136,7 +104,7 @@ std::vector<Packet> loadRecording(const std::string path)
 					Aes256::decrypt(LPBYTE("Thy key is mine © 2006 GB Monaco"), packet, packetLength);
 				}
 
-				packetList.push_back(Packet(delay, packet, packetLength));
+				packetList.push_back(Packet(timeOffset, packet, packetLength));
 			}
 		}
 	}
@@ -151,20 +119,19 @@ std::vector<Packet> loadRecording(const std::string path)
 			DWORD packetLength;
 			File.ReadDword(packetLength);
 #ifdef DEBUG
-			fprintf(pFile, "packetLength: %d\n", packetLength);
-			fflush(pFile);
+			//fprintf(pFile, "packetLength: %d\n", packetLength);
+			//fflush(pFile);
 #endif
-			DWORD delay;
-			File.ReadDword(delay);
+			DWORD timeOffset;
+			File.ReadDword(timeOffset);
 #ifdef DEBUG
-			fprintf(pFile, "delay: %d\n", delay);
+			fprintf(pFile, "timeOffset: %d\n", timeOffset);
 			fflush(pFile);
 #endif
-			sumTime += delay;
 
 			if (packetLength) {
 				LPBYTE packet = File.Skip(packetLength);
-				packetList.push_back(Packet(delay, packet, packetLength));
+				packetList.push_back(Packet(timeOffset, packet, packetLength));
 			}
 		}
 	}
@@ -172,7 +139,7 @@ std::vector<Packet> loadRecording(const std::string path)
 	return packetList;
 }
 
-void saveBynRecording(const std::string path, std::vector<Packet> packetList)
+void saveByn(const std::string path, std::vector<Packet> packetList)
 {
 	WritingFile File;
 	File.Open(path.c_str(), CREATE_ALWAYS);
@@ -181,7 +148,13 @@ void saveBynRecording(const std::string path, std::vector<Packet> packetList)
 
 	for (int i = 0; i < static_cast<int>(packetList.size()); ++i) {
 		File.WriteByte(0x65);
-		File.WriteDword(packetList[i].delay);
+
+		if (i == 0) {
+			File.WriteDword(0);
+		}
+		else {
+			File.WriteDword(packetList[i].timeOffset - packetList[i - 1].timeOffset);
+		}
 
 		File.WriteByte(0x66);
 		File.WriteDword(packetList[i].packetLength);
@@ -190,7 +163,25 @@ void saveBynRecording(const std::string path, std::vector<Packet> packetList)
 	}
 
 	File.WriteByte(0x63);
-	File.WriteDword(sumTime);
+	File.WriteDword(packetList[packetList.size() - 1].timeOffset);
+}
+
+void saveTtm(const std::string path, std::vector<Packet> packetList)
+{
+	WritingFile File;
+	File.Open(path.c_str(), CREATE_ALWAYS);
+	File.WriteWord(clientVersion);
+	File.WriteByte(0); //  host length
+	File.WriteDword(packetList[packetList.size() - 1].timeOffset);
+
+	for (int i = 0; i < static_cast<int>(packetList.size()); ++i) {
+		if (i > 0) {
+			File.WriteByte(0);
+			File.WriteDword(packetList[i].timeOffset);
+		}
+
+		File.Write(packetList[i].packet, packetList[i].packetLength);
+	}
 }
 
 int main()
@@ -199,18 +190,23 @@ int main()
 	pFile = fopen("main.log", "w");
 #endif
 
-	for (auto&& entry : std::filesystem::directory_iterator(std::filesystem::path("."))) {
-		std::string str(entry.path().string());
+	for (auto&& entry : std::filesystem::recursive_directory_iterator(std::filesystem::path("."))) {
+		std::string path(entry.path().string());
+		std::string extension(entry.path().extension().string());
 #ifdef DEBUG
-		fprintf(pFile, "file: %s, found: %d\n", str.c_str(), strpos(str, ".rec"));
+		fprintf(
+			pFile,
+			"file: %s, extension: %s\n",
+			path.c_str(),
+			extension.c_str()
+		);
 		fflush(pFile);
 #endif
 
-		if (strpos(str, ".rec") == std::string::npos) {
-			continue;
+		if (strcmp(extension.c_str(), ".rec") == 0) {
+			std::vector<Packet> packetList = loadRec(path);
+			saveByn(path + ".byn", packetList);
+			//saveTtm(path + ".ttm", packetList);
 		}
-
-		std::vector<Packet> packetList = loadRecording(entry.path().string());
-		saveBynRecording(entry.path().string() + ".byn", packetList);
 	}
 }
