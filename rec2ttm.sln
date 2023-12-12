@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32825.248
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rec2ttm", "rec2ttm.vcxproj", "{E1CAE040-1DB7-4E1D-AA8B-615A70E18304}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E1CAE040-1DB7-4E1D-AA8B-615A70E18304}.Release|x86.ActiveCfg = Release|Win32
+		{E1CAE040-1DB7-4E1D-AA8B-615A70E18304}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {39250CFF-3614-4594-B11C-42817DD09FAD}
+	EndGlobalSection
+EndGlobal
