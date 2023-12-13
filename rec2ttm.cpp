@@ -6,18 +6,9 @@
 
 //#define DEBUG
 
-WORD GuessVersion(CONST BYTE version, CONST BYTE encryption) {
-	switch (version) {
-	case 3:	switch (encryption) {
-		case 1:	return 721;
-		case 2: return 730;
-	}
-	case 4: return 770;
-	case 5: return 772;
-	case 6: return 800;
-	}
-	return 800;
-}
+#ifdef DEBUG
+FILE* pFile;
+#endif
 
 std::vector<Packet> loadRec(const std::string path)
 {
@@ -236,40 +227,56 @@ void saveTtm(const std::string path, std::vector<Packet> packetList)
 	fclose(output);
 }
 
+void processDir(const char* directoryPath)
+{
+#ifdef DEBUG
+	printf("processDir, directoryPath: %s\n", directoryPath);
+#endif
+	DIR* directory = opendir(directoryPath);
+
+	if (directory == NULL) {
+		perror("");
+		return;
+	}
+
+	struct dirent* directoryEntry;
+
+	while ((directoryEntry = readdir(directory)) != NULL) {
+		if (strcmp(directoryEntry->d_name, ".") == 0 || strcmp(directoryEntry->d_name, "..") == 0) {
+			continue;
+		}
+
+		std::string path = std::string(directoryPath) + directoryEntry->d_name;
+		const char* extension = get_filename_ext(directoryEntry->d_name);
+#ifdef DEBUG
+		printf(
+			"file: %s, type: %d, is_dir: %d, extension: %s, cmp: %d\n",
+			path.c_str(),
+			directoryEntry->d_type,
+			directoryEntry->d_type == 0x4000,
+			extension,
+			strcmp(extension, "rec")
+		);
+#endif
+		if (directoryEntry->d_type == 0x4000) {
+			processDir((path + "/").c_str());
+			continue;
+		}
+
+		if (strcmp(extension, "rec") == 0) {
+			std::vector<Packet> packetList = loadRec(path);
+			saveByn(path + ".byn", packetList);
+			saveTtm(path + ".ttm", packetList);
+		}
+	}
+
+	closedir(directory);
+}
+
 int main()
 {
 #ifdef DEBUG
 	pFile = fopen("main1.log", "w");
 #endif
-	DIR* dir;
-	struct dirent* ent;
-
-	if ((dir = opendir(".")) != NULL) {
-		while ((ent = readdir(dir)) != NULL) {
-			const char* extension = get_filename_ext(ent->d_name);
-#ifdef DEBUG
-			printf(
-				"file: %s, extension: %s, cmp: %d\n",
-				ent->d_name,
-				extension,
-				strcmp(extension, "rec")
-			);
-#endif
-			if (strcmp(extension, "rec") != 0) {
-				continue;
-			}
-
-			std::string path(ent->d_name);
-			std::vector<Packet> packetList = loadRec(path);
-			saveByn(path + ".byn", packetList);
-			saveTtm(path + ".ttm", packetList);
-		}
-
-		closedir(dir);
-	}
-	else {
-		perror("");
-		return EXIT_FAILURE;
-	}
-
+	processDir("./");
 }
