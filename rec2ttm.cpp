@@ -114,23 +114,39 @@ std::vector<Packet> loadRec(const std::string path)
 					fflush(pFile);
 				}
 
-				fprintf(pFile, "packet:\n");
+				fprintf(pFile, "\n\npacket:\n\n");
 				for (WORD i = 0; i < packetLength; i++) {
 					fprintf(pFile, "%c", packet[i]);
 					fflush(pFile);
 				}
-				fprintf(pFile, "\n");
-				fprintf(pFile, "packet hex:\n");
+				fprintf(pFile, "\n\n");
+
+				fprintf(pFile, "\n\npacket hex:\n\n");
 				for (WORD i = 0; i < packetLength; i++) {
 					fprintf(pFile, "%d", packet[i]);
 					fflush(pFile);
 				}
-				fprintf(pFile, "\n");
+				fprintf(pFile, "\n\n");
 
 				if (version > 4) {
-					Aes256::decrypt(LPBYTE("Thy key is mine © 2006 GB Monaco"), packet, packetLength);
+					//Aes256::decrypt(LPBYTE("Thy key is mine © 2006 GB Monaco"), packet, packetLength);
 				}
 
+				fprintf(pFile, "\n\npacket decrypted:\n\n");
+				for (WORD i = 0; i < packetLength; i++) {
+					fprintf(pFile, "%c", packet[i]);
+					fflush(pFile);
+				}
+				fprintf(pFile, "\n\n");
+
+				fprintf(pFile, "\n\npacket decrypted hex:\n\n");
+				for (WORD i = 0; i < packetLength; i++) {
+					fprintf(pFile, "%d", packet[i]);
+					fflush(pFile);
+				}
+				fprintf(pFile, "\n\n");
+
+				std::string packetStr(LPCSTR(packet));
 				packetList.push_back(Packet(timeOffset, packet, packetLength));
 			}
 		}
@@ -158,10 +174,16 @@ std::vector<Packet> loadRec(const std::string path)
 
 			if (packetLength) {
 				LPBYTE packet = File.Skip(packetLength);
+				std::string packetStr(LPCSTR(packet));
 				packetList.push_back(Packet(timeOffset, packet, packetLength));
 			}
 		}
 	}
+
+#ifdef DEBUG
+	fprintf(pFile, "packetList: %d\n", packetList.size());
+	fflush(pFile);
+#endif
 
 	return packetList;
 }
@@ -207,6 +229,8 @@ void saveTtm(const std::string path, std::vector<Packet> packetList)
 			File.WriteDword(packetList[i].timeOffset);
 		}
 
+		File.WriteDword(1634760036);
+		File.WriteDword(packetList[i].packetLength);
 		File.Write(packetList[i].packet, packetList[i].packetLength);
 	}
 }
@@ -221,13 +245,13 @@ int main()
 		std::string path(entry.path().string());
 		std::string extension(entry.path().extension().string());
 #ifdef DEBUG
-		fprintf(
-			pFile,
-			"file: %s, extension: %s\n",
-			path.c_str(),
-			extension.c_str()
-		);
-		fflush(pFile);
+		//fprintf(
+		//	pFile,
+		//	"file: %s, extension: %s\n",
+		//	path.c_str(),
+		//	extension.c_str()
+		//);
+		//fflush(pFile);
 #endif
 
 		if (strcmp(extension.c_str(), ".rec") == 0) {
