@@ -63,10 +63,6 @@ std::vector<Packet> loadRec(const std::string path)
 			if (!packetLength) {
 				uint32_t Avail;
 				fread(&Avail, sizeof(uint32_t), 1, input);
-#ifdef DEBUG
-				//fprintf(pFile, "Avail: %d\n", Avail);
-				//fflush(pFile);
-#endif
 			}
 			else {
 				std::string packet;
@@ -74,22 +70,10 @@ std::vector<Packet> loadRec(const std::string path)
 				fread(&packet[0], 1, packetLength, input);
 				uint32_t Avail;
 				fread(&Avail, sizeof(uint32_t), 1, input);
-#ifdef DEBUG
-				//fprintf(pFile, "Avail: %d\n", Avail);
-				//fflush(pFile);
-#endif
 				BYTE Key = packetLength + timeOffset + 2;
-				//fprintf(pFile, "Key 4: %d\n", packetLength + timeOffset + 2);
-				//fflush(pFile);
-				//fprintf(pFile, "Key 5: %d\n", Key);
-				//fflush(pFile);
 
 				for (WORD i = 0; i < packetLength; i++) {
-					//fprintf(pFile, "Minus 0: %d\n", Key + 33 * i);
-					//fflush(pFile);
 					CHAR Minus = Key + 33 * i;
-					//fprintf(pFile, "Minus 1: %d\n", Minus);
-					//fflush(pFile);
 
 					if (Minus < 0) {
 						while (-Minus % Mod) Minus++;
@@ -98,18 +82,11 @@ std::vector<Packet> loadRec(const std::string path)
 						while (Minus % Mod) Minus++;
 					}
 
-					//fprintf(pFile, "Minus 2: %d\n", Minus);
-					//fflush(pFile);
-					//fprintf(pFile, "Data 0: %d\n", packet[i]);
-					//fflush(pFile);
 					packet[i] -= Minus;
-					//fprintf(pFile, "Data 1: %d\n", packet[i]);
-					//fflush(pFile);
 				}
 
 				if (version > 4) {
 					const char* charPacket = packet.c_str();
-					//char* cPacket = (char*)charPacket;
 					LPBYTE bPacket = (LPBYTE)charPacket;
 					Aes256::decrypt(LPBYTE("Thy key is mine © 2006 GB Monaco"), bPacket, packetLength);
 				}
@@ -160,11 +137,6 @@ std::vector<Packet> loadRec(const std::string path)
 
 void saveByn(const std::string path, std::vector<Packet> packetList)
 {
-#ifdef DEBUG
-	fprintf(pFile, "packetList: %d\n", packetList.size());
-	fflush(pFile);
-#endif
-
 	FILE* output = fopen(path.c_str(), "wb");
 	uint8_t u8 = 0x64;
 	uint32_t u32 = 0;
@@ -200,11 +172,6 @@ void saveByn(const std::string path, std::vector<Packet> packetList)
 
 void saveTtm(const std::string path, std::vector<Packet> packetList)
 {
-#ifdef DEBUG
-	fprintf(pFile, "packetList: %d\n", packetList.size());
-	fflush(pFile);
-#endif
-
 	FILE* output = fopen(path.c_str(), "wb");
 	uint8_t u8 = 0;
 	uint32_t u32 = 0;
@@ -222,6 +189,17 @@ void saveTtm(const std::string path, std::vector<Packet> packetList)
 		}
 
 		fwrite(packetList[i].packet.c_str(), packetList[i].packet.size(), 1, output);
+	}
+
+	fclose(output);
+}
+
+void saveRecord(const std::string path, std::vector<Packet> packetList)
+{
+	FILE* output = fopen(path.c_str(), "wb");
+
+	for (int i = 0; i < packetList.size(); ++i) {
+		fprintf(output, "< %d %s\n", packetList[i].timeOffset, string_to_hex(packetList[i].packet).c_str());
 	}
 
 	fclose(output);
@@ -264,9 +242,11 @@ void processDir(const char* directoryPath)
 		}
 
 		if (strcmp(extension, "rec") == 0) {
+			printf("path: %s\n", path.c_str());
 			std::vector<Packet> packetList = loadRec(path);
 			saveByn(path + ".byn", packetList);
 			saveTtm(path + ".ttm", packetList);
+			saveRecord(path + ".record", packetList);
 		}
 	}
 
