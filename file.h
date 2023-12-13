@@ -5,11 +5,11 @@ FILE* pFile;
 WORD clientVersion;
 
 struct Packet {
-	DWORD timeOffset;
-	LPBYTE packet;
-	DWORD packetLength;
+	uint32_t timeOffset;
+	std::string packet;
+	uint32_t packetLength;
 
-	Packet(DWORD timeOffset, LPBYTE packet, DWORD packetLength) {
+	Packet(uint32_t timeOffset, std::string packet, uint32_t packetLength) {
 		this->timeOffset = timeOffset;
 		this->packet = packet;
 		this->packetLength = packetLength;

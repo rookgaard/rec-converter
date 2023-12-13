@@ -21,16 +21,15 @@ WORD GuessVersion(CONST BYTE version, CONST BYTE encryption) {
 std::vector<Packet> loadRec(const std::string path)
 {
 	std::vector<Packet> packetList;
-	BufferedFile File;
-	File.Open(path.c_str());
+	FILE* input = fopen(path.c_str(), "rb");
 	BYTE version;
-	File.ReadByte(version);
+	fread(&version, sizeof(BYTE), 1, input);
 #ifdef DEBUG
 	fprintf(pFile, "version: %d\n", version);
 	fflush(pFile);
 #endif
 	BYTE encryption;
-	File.ReadByte(encryption);
+	fread(&encryption, sizeof(BYTE), 1, input);
 #ifdef DEBUG
 	fprintf(pFile, "encryption: %d\n", encryption);
 	fflush(pFile);
@@ -40,10 +39,10 @@ std::vector<Packet> loadRec(const std::string path)
 	fprintf(pFile, "clientVersion: %d\n", clientVersion);
 	fflush(pFile);
 #endif
-	DWORD packets;
+	int packets;
 
 	if (encryption == 2) {
-		File.ReadDword(packets);
+		fread(&packets, sizeof(int), 1, input);
 		packets -= 57;
 #ifdef DEBUG
 		fprintf(pFile, "packets: %d\n", packets);
@@ -56,47 +55,49 @@ std::vector<Packet> loadRec(const std::string path)
 #endif
 
 		for (DWORD i = 0; i < packets; i++) {
-			WORD packetLength;
-			File.ReadWord(packetLength);
+			uint16_t packetLength;
+			fread(&packetLength, sizeof(uint16_t), 1, input);
 #ifdef DEBUG
 			fprintf(pFile, "packetLength: %d\n", packetLength);
 			fflush(pFile);
 #endif
-			DWORD timeOffset;
-			File.ReadDword(timeOffset);
+			uint32_t timeOffset;
+			fread(&timeOffset, sizeof(uint32_t), 1, input);
 #ifdef DEBUG
 			fprintf(pFile, "timeOffset: %d\n", timeOffset);
 			fflush(pFile);
 #endif
 
 			if (!packetLength) {
-				DWORD Avail;
-				File.ReadDword(Avail);
+				uint32_t Avail;
+				fread(&Avail, sizeof(uint32_t), 1, input);
 #ifdef DEBUG
-				fprintf(pFile, "Avail: %d\n", Avail);
-				fflush(pFile);
+				//fprintf(pFile, "Avail: %d\n", Avail);
+				//fflush(pFile);
 #endif
 			}
 			else {
-				LPBYTE packet = File.Skip(packetLength);
-				DWORD Avail;
-				File.ReadDword(Avail);
+				std::string packet;
+				packet.resize(packetLength);
+				fread(&packet[0], 1, packetLength, input);
+				uint32_t Avail;
+				fread(&Avail, sizeof(uint32_t), 1, input);
 #ifdef DEBUG
-				fprintf(pFile, "Avail: %d\n", Avail);
-				fflush(pFile);
+				//fprintf(pFile, "Avail: %d\n", Avail);
+				//fflush(pFile);
 #endif
 				BYTE Key = packetLength + timeOffset + 2;
-				fprintf(pFile, "Key 4: %d\n", packetLength + timeOffset + 2);
-				fflush(pFile);
-				fprintf(pFile, "Key 5: %d\n", Key);
-				fflush(pFile);
+				//fprintf(pFile, "Key 4: %d\n", packetLength + timeOffset + 2);
+				//fflush(pFile);
+				//fprintf(pFile, "Key 5: %d\n", Key);
+				//fflush(pFile);
 
 				for (WORD i = 0; i < packetLength; i++) {
-					fprintf(pFile, "Minus 0: %d\n", Key + 33 * i);
-					fflush(pFile);
+					//fprintf(pFile, "Minus 0: %d\n", Key + 33 * i);
+					//fflush(pFile);
 					CHAR Minus = Key + 33 * i;
-					fprintf(pFile, "Minus 1: %d\n", Minus);
-					fflush(pFile);
+					//fprintf(pFile, "Minus 1: %d\n", Minus);
+					//fflush(pFile);
 
 					if (Minus < 0) {
 						while (-Minus % Mod) Minus++;
@@ -105,46 +106,21 @@ std::vector<Packet> loadRec(const std::string path)
 						while (Minus % Mod) Minus++;
 					}
 
-					fprintf(pFile, "Minus 2: %d\n", Minus);
-					fflush(pFile);
-					fprintf(pFile, "Data 0: %d\n", packet[i]);
-					fflush(pFile);
+					//fprintf(pFile, "Minus 2: %d\n", Minus);
+					//fflush(pFile);
+					//fprintf(pFile, "Data 0: %d\n", packet[i]);
+					//fflush(pFile);
 					packet[i] -= Minus;
-					fprintf(pFile, "Data 1: %d\n", packet[i]);
-					fflush(pFile);
+					//fprintf(pFile, "Data 1: %d\n", packet[i]);
+					//fflush(pFile);
 				}
-
-				fprintf(pFile, "\n\npacket:\n\n");
-				for (WORD i = 0; i < packetLength; i++) {
-					fprintf(pFile, "%c", packet[i]);
-					fflush(pFile);
-				}
-				fprintf(pFile, "\n\n");
-
-				fprintf(pFile, "\n\npacket hex:\n\n");
-				for (WORD i = 0; i < packetLength; i++) {
-					fprintf(pFile, "%d", packet[i]);
-					fflush(pFile);
-				}
-				fprintf(pFile, "\n\n");
 
 				if (version > 4) {
-					//Aes256::decrypt(LPBYTE("Thy key is mine © 2006 GB Monaco"), packet, packetLength);
+					const char* charPacket = packet.c_str();
+					//char* cPacket = (char*)charPacket;
+					LPBYTE bPacket = (LPBYTE)charPacket;
+					Aes256::decrypt(LPBYTE("Thy key is mine © 2006 GB Monaco"), bPacket, packetLength);
 				}
-
-				fprintf(pFile, "\n\npacket decrypted:\n\n");
-				for (WORD i = 0; i < packetLength; i++) {
-					fprintf(pFile, "%c", packet[i]);
-					fflush(pFile);
-				}
-				fprintf(pFile, "\n\n");
-
-				fprintf(pFile, "\n\npacket decrypted hex:\n\n");
-				for (WORD i = 0; i < packetLength; i++) {
-					fprintf(pFile, "%d", packet[i]);
-					fflush(pFile);
-				}
-				fprintf(pFile, "\n\n");
 
 				std::string packetStr(LPCSTR(packet));
 				packetList.push_back(Packet(timeOffset, packet, packetLength));
@@ -152,33 +128,36 @@ std::vector<Packet> loadRec(const std::string path)
 		}
 	}
 	else {
-		File.ReadDword(packets);
+		fread(&packets, sizeof(int), 1, input);
 #ifdef DEBUG
-		//fprintf(pFile, "packets: %d\n", packets);
-		//fflush(pFile);
+		fprintf(pFile, "packets: %d\n", packets);
+		fflush(pFile);
 #endif
 
-		for (DWORD i = 0; i < packets; i++) {
-			DWORD packetLength;
-			File.ReadDword(packetLength);
+		for (int i = 0; i < packets; i++) {
+			int packetLength;
+			fread(&packetLength, sizeof(int), 1, input);
 #ifdef DEBUG
-			//fprintf(pFile, "packetLength: %d\n", packetLength);
-			//fflush(pFile);
+			fprintf(pFile, "packetLength: %d\n", packetLength);
+			fflush(pFile);
 #endif
-			DWORD timeOffset;
-			File.ReadDword(timeOffset);
+			int timeOffset;
+			fread(&timeOffset, sizeof(int), 1, input);
 #ifdef DEBUG
-			//fprintf(pFile, "timeOffset: %d\n", timeOffset);
-			//fflush(pFile);
+			fprintf(pFile, "timeOffset: %d\n", timeOffset);
+			fflush(pFile);
 #endif
 
 			if (packetLength) {
-				LPBYTE packet = File.Skip(packetLength);
-				std::string packetStr(LPCSTR(packet));
+				std::string packet;
+				packet.resize(packetLength);
+				fread(&packet[0], 1, packetLength, input);
 				packetList.push_back(Packet(timeOffset, packet, packetLength));
 			}
 		}
 	}
+
+	fclose(input);
 
 #ifdef DEBUG
 	fprintf(pFile, "packetList: %d\n", packetList.size());
@@ -190,49 +169,71 @@ std::vector<Packet> loadRec(const std::string path)
 
 void saveByn(const std::string path, std::vector<Packet> packetList)
 {
-	WritingFile File;
-	File.Open(path.c_str(), CREATE_ALWAYS);
-	File.WriteByte(0x64);
-	File.WriteWord(clientVersion);
+#ifdef DEBUG
+	fprintf(pFile, "packetList: %d\n", packetList.size());
+	fflush(pFile);
+#endif
 
-	for (int i = 0; i < static_cast<int>(packetList.size()); ++i) {
-		File.WriteByte(0x65);
+	FILE* output = fopen(path.c_str(), "wb");
+	uint8_t u8 = 0x64;
+	uint32_t u32 = 0;
+	fwrite(&u8, sizeof(uint8_t), 1, output);
+	fwrite(&clientVersion, sizeof(uint16_t), 1, output);
+
+	for (int i = 0; i < packetList.size(); ++i) {
+		u8 = 0x65;
+		fwrite(&u8, sizeof(uint8_t), 1, output);
 
 		if (i == 0) {
-			File.WriteDword(0);
+			fwrite(&u32, sizeof(uint32_t), 1, output);
 		}
 		else {
-			File.WriteDword(packetList[i].timeOffset - packetList[i - 1].timeOffset);
+			u32 = packetList[i].timeOffset - packetList[i - 1].timeOffset;
+			fwrite(&u32, sizeof(uint32_t), 1, output);
 		}
 
-		File.WriteByte(0x66);
-		File.WriteDword(packetList[i].packetLength);
-
-		File.Write(packetList[i].packet, packetList[i].packetLength);
+		u8 = 0x66;
+		fwrite(&u8, sizeof(uint8_t), 1, output);
+		u32 = packetList[i].packetLength;
+		fwrite(&u32, sizeof(uint32_t), 1, output);
+		fwrite(packetList[i].packet.c_str(), packetList[i].packet.size(), 1, output);
 	}
 
-	File.WriteByte(0x63);
-	File.WriteDword(packetList[packetList.size() - 1].timeOffset);
+	u8 = 0x63;
+	fwrite(&u8, sizeof(uint8_t), 1, output);
+	u32 = packetList[packetList.size() - 1].timeOffset;
+	fwrite(&u32, sizeof(uint32_t), 1, output);
+
+	fclose(output);
 }
 
 void saveTtm(const std::string path, std::vector<Packet> packetList)
 {
-	WritingFile File;
-	File.Open(path.c_str(), CREATE_ALWAYS);
-	File.WriteWord(clientVersion);
-	File.WriteByte(0); //  host length
-	File.WriteDword(packetList[packetList.size() - 1].timeOffset);
+#ifdef DEBUG
+	fprintf(pFile, "packetList: %d\n", packetList.size());
+	fflush(pFile);
+#endif
 
-	for (int i = 0; i < static_cast<int>(packetList.size()); ++i) {
+	FILE* output = fopen(path.c_str(), "wb");
+	uint8_t u8 = 0;
+	uint32_t u32 = 0;
+	fwrite(&clientVersion, sizeof(uint16_t), 1, output);
+	fwrite(&u8, sizeof(uint8_t), 1, output); // host length
+	u32 = packetList[packetList.size() - 1].timeOffset;
+	fwrite(&u32, sizeof(uint32_t), 1, output);
+
+	for (int i = 0; i < packetList.size(); ++i) {
 		if (i > 0) {
-			File.WriteByte(0);
-			File.WriteDword(packetList[i].timeOffset);
+			u8 = 0;
+			fwrite(&u8, sizeof(uint8_t), 1, output);
+			u32 = packetList[i].timeOffset;
+			fwrite(&u32, sizeof(uint32_t), 1, output);
 		}
 
-		File.WriteDword(1634760036);
-		File.WriteDword(packetList[i].packetLength);
-		File.Write(packetList[i].packet, packetList[i].packetLength);
+		fwrite(packetList[i].packet.c_str(), packetList[i].packet.size(), 1, output);
 	}
+
+	fclose(output);
 }
 
 int main()
@@ -245,18 +246,19 @@ int main()
 		std::string path(entry.path().string());
 		std::string extension(entry.path().extension().string());
 #ifdef DEBUG
-		//fprintf(
-		//	pFile,
-		//	"file: %s, extension: %s\n",
-		//	path.c_str(),
-		//	extension.c_str()
-		//);
-		//fflush(pFile);
+		fprintf(
+			pFile,
+			"file: %s, extension: %s\n",
+			path.c_str(),
+			extension.c_str()
+		);
+		fflush(pFile);
 #endif
 
 		if (strcmp(extension.c_str(), ".rec") == 0) {
+			//std::vector<Packet> packetList = loadRec(path);
 			std::vector<Packet> packetList = loadRec(path);
-			//saveByn(path + ".byn", packetList);
+			saveByn(path + ".byn", packetList);
 			saveTtm(path + ".ttm", packetList);
 		}
 	}
