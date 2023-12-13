@@ -1,9 +1,10 @@
 #include <iostream>
-#include <filesystem>
+#include <vector>
 #include "file.h"
 #include "aes256.h"
+#include "dirent.h"
 
-#define DEBUG
+//#define DEBUG
 
 WORD GuessVersion(CONST BYTE version, CONST BYTE encryption) {
 	switch (version) {
@@ -122,7 +123,6 @@ std::vector<Packet> loadRec(const std::string path)
 					Aes256::decrypt(LPBYTE("Thy key is mine © 2006 GB Monaco"), bPacket, packetLength);
 				}
 
-				std::string packetStr(LPCSTR(packet));
 				packetList.push_back(Packet(timeOffset, packet, packetLength));
 			}
 		}
@@ -241,25 +241,35 @@ int main()
 #ifdef DEBUG
 	pFile = fopen("main1.log", "w");
 #endif
+	DIR* dir;
+	struct dirent* ent;
 
-	for (auto&& entry : std::filesystem::recursive_directory_iterator(std::filesystem::path("."))) {
-		std::string path(entry.path().string());
-		std::string extension(entry.path().extension().string());
+	if ((dir = opendir(".")) != NULL) {
+		while ((ent = readdir(dir)) != NULL) {
+			const char* extension = get_filename_ext(ent->d_name);
 #ifdef DEBUG
-		fprintf(
-			pFile,
-			"file: %s, extension: %s\n",
-			path.c_str(),
-			extension.c_str()
-		);
-		fflush(pFile);
+			printf(
+				"file: %s, extension: %s, cmp: %d\n",
+				ent->d_name,
+				extension,
+				strcmp(extension, "rec")
+			);
 #endif
+			if (strcmp(extension, "rec") != 0) {
+				continue;
+			}
 
-		if (strcmp(extension.c_str(), ".rec") == 0) {
-			//std::vector<Packet> packetList = loadRec(path);
+			std::string path(ent->d_name);
 			std::vector<Packet> packetList = loadRec(path);
 			saveByn(path + ".byn", packetList);
 			saveTtm(path + ".ttm", packetList);
 		}
+
+		closedir(dir);
 	}
+	else {
+		perror("");
+		return EXIT_FAILURE;
+	}
+
 }
