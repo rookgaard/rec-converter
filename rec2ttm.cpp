@@ -254,7 +254,7 @@ void saveRecord(const std::string path, std::vector<Packet> packetList)
 	FILE* output = fopen(path.c_str(), "wb");
 
 	for (size_t i = 0; i < packetList.size(); ++i) {
-		fprintf(output, "< %d %s\n", packetList[i].timeOffset, string_to_hex(packetList[i].packet).c_str());
+		fprintf(output, "< %d %s\n", packetList[i].timeOffset, string_to_hex(packetList[i].packet.substr(2)).c_str());
 	}
 
 	fclose(output);
