@@ -61,15 +61,13 @@ std::vector<Packet> loadRec(const std::string path)
 #endif
 
 			if (!packetLength) {
-				uint32_t Avail;
-				fread(&Avail, sizeof(uint32_t), 1, input);
+				fseek(input, 4, SEEK_CUR); // unused
 			}
 			else {
 				std::string packet;
 				packet.resize(packetLength);
 				fread(&packet[0], 1, packetLength, input);
-				uint32_t Avail;
-				fread(&Avail, sizeof(uint32_t), 1, input);
+				fseek(input, 4, SEEK_CUR); // unused
 				BYTE Key = packetLength + timeOffset + 2;
 
 				for (WORD i = 0; i < packetLength; i++) {
@@ -89,6 +87,9 @@ std::vector<Packet> loadRec(const std::string path)
 					const char* charPacket = packet.c_str();
 					LPBYTE bPacket = (LPBYTE)charPacket;
 					Aes256::decrypt(LPBYTE("Thy key is mine © 2006 GB Monaco"), bPacket, packetLength);
+					// after decrypting, real packet size is on first 2 bytes of packet
+					packetLength = bPacket[0] + bPacket[1] * 256;
+					packet = packet.substr(0, packetLength + 2);
 				}
 
 				packetList.push_back(Packet(timeOffset, packet, packetLength));
@@ -139,6 +140,7 @@ void saveByn(const std::string path, std::vector<Packet> packetList)
 {
 	FILE* output = fopen(path.c_str(), "wb");
 	uint8_t u8 = 0x64;
+	uint16_t u16 = 0;
 	uint32_t u32 = 0;
 	fwrite(&u8, sizeof(uint8_t), 1, output);
 	fwrite(&clientVersion, sizeof(uint16_t), 1, output);
@@ -148,17 +150,16 @@ void saveByn(const std::string path, std::vector<Packet> packetList)
 		fwrite(&u8, sizeof(uint8_t), 1, output);
 
 		if (i == 0) {
-			fwrite(&u32, sizeof(uint32_t), 1, output);
+			u16 = 0;
+			fwrite(&u16, sizeof(uint16_t), 1, output);
 		}
 		else {
-			u32 = packetList[i].timeOffset - packetList[i - 1].timeOffset;
-			fwrite(&u32, sizeof(uint32_t), 1, output);
+			u16 = packetList[i].timeOffset - packetList[i - 1].timeOffset;
+			fwrite(&u16, sizeof(uint16_t), 1, output);
 		}
 
 		u8 = 0x66;
 		fwrite(&u8, sizeof(uint8_t), 1, output);
-		u32 = packetList[i].packetLength;
-		fwrite(&u32, sizeof(uint32_t), 1, output);
 		fwrite(packetList[i].packet.c_str(), packetList[i].packet.size(), 1, output);
 	}
 
@@ -174,6 +175,7 @@ void saveTtm(const std::string path, std::vector<Packet> packetList)
 {
 	FILE* output = fopen(path.c_str(), "wb");
 	uint8_t u8 = 0;
+	uint16_t u16 = 0;
 	uint32_t u32 = 0;
 	fwrite(&clientVersion, sizeof(uint16_t), 1, output);
 	fwrite(&u8, sizeof(uint8_t), 1, output); // host length
@@ -184,8 +186,8 @@ void saveTtm(const std::string path, std::vector<Packet> packetList)
 		if (i > 0) {
 			u8 = 0;
 			fwrite(&u8, sizeof(uint8_t), 1, output);
-			u32 = packetList[i].timeOffset;
-			fwrite(&u32, sizeof(uint32_t), 1, output);
+			u16 = packetList[i].timeOffset - packetList[i - 1].timeOffset;
+			fwrite(&u16, sizeof(uint16_t), 1, output);
 		}
 
 		fwrite(packetList[i].packet.c_str(), packetList[i].packet.size(), 1, output);
