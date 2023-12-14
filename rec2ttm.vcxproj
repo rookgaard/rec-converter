@@ -56,6 +56,8 @@
     <ClInclude Include="aes256.h" />
     <ClInclude Include="dirent.h" />
     <ClInclude Include="file.h" />
+    <ClInclude Include="zconf.h" />
+    <ClInclude Include="zlib.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

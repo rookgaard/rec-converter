@@ -3,6 +3,7 @@
 #include "file.h"
 #include "aes256.h"
 #include "dirent.h"
+#include "zlib.h"
 
 //#define DEBUG
 
@@ -207,6 +208,28 @@ void saveRecord(const std::string path, std::vector<Packet> packetList)
 	fclose(output);
 }
 
+void saveTmv(const std::string path, std::vector<Packet> packetList)
+{
+	gzFile output = gzopen(path.c_str(), "wb");
+	uint8_t u8 = 0;
+	uint16_t u16 = 2;
+	uint32_t u32 = 0;
+	gzwrite(output, &u16, sizeof(uint16_t)); // tmv version
+	gzwrite(output, &clientVersion, sizeof(uint16_t));
+	u32 = packetList[packetList.size() - 1].timeOffset;
+	gzwrite(output, &u32, sizeof(uint32_t));
+
+	for (int i = 0; i < packetList.size(); ++i) {
+		u8 = 0;
+		gzwrite(output, &u8, sizeof(uint8_t));
+		u16 = i == 0 ? 0 : packetList[i].timeOffset - packetList[i - 1].timeOffset;
+		gzwrite(output, &u16, sizeof(uint16_t));
+		gzwrite(output, packetList[i].packet.c_str(), packetList[i].packet.size());
+	}
+
+	gzclose(output);
+}
+
 void processDir(const char* directoryPath)
 {
 #ifdef DEBUG
@@ -249,6 +272,7 @@ void processDir(const char* directoryPath)
 			saveByn(path + ".byn", packetList);
 			saveTtm(path + ".ttm", packetList);
 			saveRecord(path + ".record", packetList);
+			saveTmv(path + ".tmv", packetList);
 		}
 	}
 
