@@ -47,7 +47,7 @@ std::vector<Packet> loadRec(const std::string path)
 		fflush(pFile);
 #endif
 
-		for (DWORD i = 0; i < packets; i++) {
+		for (int i = 0; i < packets; i++) {
 			uint16_t packetLength;
 			fread(&packetLength, sizeof(uint16_t), 1, input);
 #ifdef DEBUG
@@ -93,7 +93,7 @@ std::vector<Packet> loadRec(const std::string path)
 					packet = packet.substr(0, packetLength + 2);
 				}
 
-				packetList.push_back(Packet(timeOffset, packet, packetLength));
+				packetList.push_back(Packet(timeOffset, packet));
 			}
 		}
 	}
@@ -122,9 +122,62 @@ std::vector<Packet> loadRec(const std::string path)
 				std::string packet;
 				packet.resize(packetLength);
 				fread(&packet[0], 1, packetLength, input);
-				packetList.push_back(Packet(timeOffset, packet, packetLength));
+				packetList.push_back(Packet(timeOffset, packet));
 			}
 		}
+	}
+
+	fclose(input);
+
+#ifdef DEBUG
+	fprintf(pFile, "packetList: %d\n", packetList.size());
+	fflush(pFile);
+#endif
+
+	return packetList;
+}
+
+std::vector<Packet> loadCam(const std::string path)
+{
+	std::vector<Packet> packetList;
+	FILE* input = fopen(path.c_str(), "rb");
+	uint32_t headerLength;
+	fread(&headerLength, sizeof(uint32_t), 1, input);
+#ifdef DEBUG
+	fprintf(pFile, "headerLength: %d\n", headerLength);
+	fflush(pFile);
+#endif
+	fseek(input, headerLength, SEEK_CUR); // unused
+	uint32_t timestamp;
+	fread(&timestamp, sizeof(uint32_t), 1, input);
+#ifdef DEBUG
+	fprintf(pFile, "timestamp: %d\n", timestamp);
+	fflush(pFile);
+#endif
+	fseek(input, -4, SEEK_CUR);
+
+	while (!feof(input)) {
+		uint32_t timeOffset;
+		fread(&timeOffset, sizeof(uint32_t), 1, input);
+#ifdef DEBUG
+		fprintf(pFile, "timeOffset: %d\n", timeOffset);
+		fflush(pFile);
+#endif
+		fseek(input, 4, SEEK_CUR); // 00 00 00 00
+
+		uint16_t packetLength;
+		fread(&packetLength, sizeof(uint16_t), 1, input);
+#ifdef DEBUG
+		fprintf(pFile, "packetLength: %d\n", packetLength);
+		fflush(pFile);
+#endif
+
+		std::string packet;
+		packet.resize(packetLength + 2);
+		fseek(input, -2, SEEK_CUR);
+		fread(&packet[0], 1, packetLength + 2, input);
+
+		packetList.push_back(Packet(timeOffset - timestamp, packet));
 	}
 
 	fclose(input);
@@ -146,7 +199,7 @@ void saveByn(const std::string path, std::vector<Packet> packetList)
 	fwrite(&u8, sizeof(uint8_t), 1, output);
 	fwrite(&clientVersion, sizeof(uint16_t), 1, output);
 
-	for (int i = 0; i < packetList.size(); ++i) {
+	for (size_t i = 0; i < packetList.size(); ++i) {
 		u8 = 0x65;
 		fwrite(&u8, sizeof(uint8_t), 1, output);
 
@@ -183,7 +236,7 @@ void saveTtm(const std::string path, std::vector<Packet> packetList)
 	u32 = packetList[packetList.size() - 1].timeOffset;
 	fwrite(&u32, sizeof(uint32_t), 1, output);
 
-	for (int i = 0; i < packetList.size(); ++i) {
+	for (size_t i = 0; i < packetList.size(); ++i) {
 		if (i > 0) {
 			u8 = 0;
 			fwrite(&u8, sizeof(uint8_t), 1, output);
@@ -201,7 +254,7 @@ void saveRecord(const std::string path, std::vector<Packet> packetList)
 {
 	FILE* output = fopen(path.c_str(), "wb");
 
-	for (int i = 0; i < packetList.size(); ++i) {
+	for (size_t i = 0; i < packetList.size(); ++i) {
 		fprintf(output, "< %d %s\n", packetList[i].timeOffset, string_to_hex(packetList[i].packet).c_str());
 	}
 
@@ -219,7 +272,7 @@ void saveTmv(const std::string path, std::vector<Packet> packetList)
 	u32 = packetList[packetList.size() - 1].timeOffset;
 	gzwrite(output, &u32, sizeof(uint32_t));
 
-	for (int i = 0; i < packetList.size(); ++i) {
+	for (size_t i = 0; i < packetList.size(); ++i) {
 		u8 = 0;
 		gzwrite(output, &u8, sizeof(uint8_t));
 		u16 = i == 0 ? 0 : packetList[i].timeOffset - packetList[i - 1].timeOffset;
@@ -266,9 +319,18 @@ void processDir(const char* directoryPath)
 			continue;
 		}
 
+		std::vector<Packet> packetList;
+
 		if (strcmp(extension, "rec") == 0) {
 			printf("path: %s\n", path.c_str());
-			std::vector<Packet> packetList = loadRec(path);
+			packetList = loadRec(path);
+		}
+		else if (strcmp(extension, "cam") == 0) {
+			printf("path: %s\n", path.c_str());
+			packetList = loadCam(path);
+		}
+
+		if (packetList.size()) {
 			saveByn(path + ".byn", packetList);
 			saveTtm(path + ".ttm", packetList);
 			saveRecord(path + ".record", packetList);
