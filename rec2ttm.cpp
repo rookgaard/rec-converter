@@ -141,6 +141,13 @@ std::vector<Packet> loadCam(const std::string path)
 {
 	std::vector<Packet> packetList;
 	FILE* input = fopen(path.c_str(), "rb");
+	fseek(input, 0, SEEK_END);
+	int filesize = ftell(input);
+#ifdef DEBUG
+	fprintf(pFile, "filesize: %d\n", filesize);
+	fflush(pFile);
+#endif
+	fseek(input, 0, SEEK_SET);
 	uint32_t headerLength;
 	fread(&headerLength, sizeof(uint32_t), 1, input);
 #ifdef DEBUG
@@ -156,7 +163,7 @@ std::vector<Packet> loadCam(const std::string path)
 #endif
 	fseek(input, -4, SEEK_CUR);
 
-	while (!feof(input)) {
+	while (ftell(input) < filesize) {
 		uint32_t timeOffset;
 		fread(&timeOffset, sizeof(uint32_t), 1, input);
 #ifdef DEBUG
@@ -202,16 +209,8 @@ void saveByn(const std::string path, std::vector<Packet> packetList)
 	for (size_t i = 0; i < packetList.size(); ++i) {
 		u8 = 0x65;
 		fwrite(&u8, sizeof(uint8_t), 1, output);
-
-		if (i == 0) {
-			u16 = 0;
-			fwrite(&u16, sizeof(uint16_t), 1, output);
-		}
-		else {
-			u16 = packetList[i].timeOffset - packetList[i - 1].timeOffset;
-			fwrite(&u16, sizeof(uint16_t), 1, output);
-		}
-
+		u16 = i == 0 ? 0 : packetList[i].timeOffset - packetList[i - 1].timeOffset;
+		fwrite(&u16, sizeof(uint16_t), 1, output);
 		u8 = 0x66;
 		fwrite(&u8, sizeof(uint8_t), 1, output);
 		fwrite(packetList[i].packet.c_str(), packetList[i].packet.size(), 1, output);
@@ -283,6 +282,28 @@ void saveTmv(const std::string path, std::vector<Packet> packetList)
 	gzclose(output);
 }
 
+void saveCam(const std::string path, std::vector<Packet> packetList)
+{
+	FILE* output = fopen(path.c_str(), "wb");
+	uint32_t u32;
+
+	u32 = 8;
+	fwrite(&u32, sizeof(uint32_t), 1, output);
+	u32 = 0;
+	fwrite(&u32, sizeof(uint32_t), 1, output);
+	fwrite(&u32, sizeof(uint32_t), 1, output);
+
+	for (size_t i = 0; i < packetList.size(); ++i) {
+		u32 = i == 0 ? 0 : packetList[i].timeOffset;
+		fwrite(&u32, sizeof(uint32_t), 1, output);
+		u32 = 0;
+		fwrite(&u32, sizeof(uint32_t), 1, output);
+		fwrite(packetList[i].packet.c_str(), packetList[i].packet.size(), 1, output);
+	}
+
+	fclose(output);
+}
+
 void processDir(const char* directoryPath)
 {
 #ifdef DEBUG
@@ -335,6 +356,7 @@ void processDir(const char* directoryPath)
 			saveTtm(path + ".ttm", packetList);
 			saveRecord(path + ".record", packetList);
 			saveTmv(path + ".tmv", packetList);
+			saveCam(path + ".cam", packetList);
 		}
 	}
 
